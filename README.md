@@ -6,7 +6,7 @@
     - https://github.com/SergeyCh92/nodal_analysis.git
     - https://github.com/SergeyCh92/gateway.git
     - https://github.com/SergeyCh92/common.git
-2. Скопировать docker-compose.yaml в папку, в которой находятся директории содержащие код сервисов.
+2. Скопировать docker-compose.yaml в папку, в которой находятся директории, содержащие код сервисов.
 Т.е. файл docker-compose должен быть на одном уровне с директориями, в противном случае задеплоить
 сервисы не удастся.
 3. Убедиться, что на ПК установлен python 3.11.1, при необходимости установить.
