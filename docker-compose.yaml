@@ -1,0 +1,121 @@
+version: "3"
+services:
+  rabbitmq:
+    container_name: rabbit
+    image: rabbitmq:3.10.7-management
+    hostname: rabbit
+    restart: unless-stopped
+    build:
+      context: ./RabbitMQ/
+      dockerfile: ./Dockerfile
+    environment:
+      # креды указаны в открытом виде в рамках допущения, что это тестовая задача
+      - RABBITMQ_DEFAULT_USER=rmuser
+      - RABBITMQ_DEFAULT_PASS=rmpassword
+    volumes:
+      - ./RabbitMQ/rabbitmq:/var/lib/rabbitmq
+      - ./RabbitMQ/certs/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./RabbitMQ/certs/ca_certificate.pem:/etc/ssl/rmq-cacert.pem:ro
+      - ./RabbitMQ/certs/server_mylaptop_certificate.pem:/etc/ssl/rmq-cert.pem:ro
+      - ./RabbitMQ/certs/server_mylaptop_key.pem:/etc/ssl/rmq-key.pem:ro
+    ports:
+      - 15672:15672
+      - 5672:5672
+      - 5671:5671
+  postgres:
+    container_name: postgres-gpn
+    hostname: postgres-gpn
+    image: postgres:16.1
+    environment:
+      # креды указаны в открытом виде в рамках допущения, что это тестовая задача
+      POSTGRES_DB: "gpn"
+      POSTGRES_USER: "admin"
+      POSTGRES_PASSWORD: "admin"
+      PGDATA: /data/postgres
+    volumes:
+      - ./postgres_data:/data/postgres
+    ports:
+      - "8503:5432"
+    restart: unless-stopped
+  gateway-service:
+    container_name: gateway-service
+    hostname: gateway_service
+    restart: unless-stopped
+    build:
+      context: ./gateway_service/
+      dockerfile: docker/Dockerfile
+    ports:
+      - 5007:5007
+    environment:
+      # креды указаны в открытом виде в рамках допущения, что это тестовая задача
+      RABBIT_PORT: 5672
+      RABBIT_HOST: "rabbit"
+      RABBIT_USER: "rmuser"
+      RABBIT_PASSWORD: "rmpassword"
+      DB_HOST: "postgres-gpn"
+      DB_PORT: 5432
+    depends_on:
+      - rabbitmq
+      - postgres
+    command:
+      [
+        "uvicorn",
+        "gateway_service.core.app:create_app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "5007"
+      ]
+  vlp:
+    container_name: vlp
+    restart: unless-stopped
+    build:
+      context: ./vlp_service/
+      dockerfile: docker/Dockerfile
+    environment:
+      RABBIT_PORT: 5672
+      RABBIT_HOST: "rabbit"
+      # креды указаны в открытом виде в рамках допущения, что это тестовая задача
+      RABBIT_USER: "rmuser"
+      RABBIT_PASSWORD: "rmpassword"
+      GATEWAY_SERVICE_URL: "http://gateway_service:5007"
+    depends_on:
+      - rabbitmq
+      - postgres
+      - gateway-service
+    links: 
+        - rabbitmq
+  ipr:
+    container_name: ipr
+    restart: unless-stopped
+    build:
+      context: ./mock_ipr_service/
+      dockerfile: docker/Dockerfile
+    environment:
+      RABBIT_PORT: 5672
+      # креды указаны в открытом виде в рамках допущения, что это тестовая задача
+      RABBIT_HOST: "rabbit"
+      RABBIT_USER: "rmuser"
+      RABBIT_PASSWORD: "rmpassword"
+      GATEWAY_SERVICE_URL: "http://gateway-service:5007"
+    depends_on:
+      - rabbitmq
+      - postgres
+      - gateway-service
+  nodal-analysis:
+    container_name: nodal-analysis
+    restart: unless-stopped
+    build:
+      context: ./nodal_analysis/
+      dockerfile: docker/Dockerfile
+    environment:
+      RABBIT_PORT: 5672
+      # креды указаны в открытом виде в рамках допущения, что это тестовая задача
+      RABBIT_HOST: "rabbit"
+      RABBIT_USER: "rmuser"
+      RABBIT_PASSWORD: "rmpassword"
+      GATEWAY_SERVICE_URL: "http://gateway-service:5007"
+    depends_on:
+      - rabbitmq
+      - postgres
+      - gateway-service
